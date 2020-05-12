@@ -40,6 +40,7 @@ END_MESSAGE_MAP()
 CimageProcessingDoc::CimageProcessingDoc() noexcept
 {
 	// TODO: 在此添加一次性构造代码
+	//更新了
 
 }
 
