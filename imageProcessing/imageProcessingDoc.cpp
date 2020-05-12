@@ -32,6 +32,11 @@ BEGIN_MESSAGE_MAP(CimageProcessingDoc, CDocument)
 	ON_COMMAND(ID_IMAGE_ADD, &CimageProcessingDoc::OnImageAdd)
 	ON_COMMAND(ID_32788, &CimageProcessingDoc::OnHsvHue)
 	ON_COMMAND(ID_32789, &CimageProcessingDoc::OnHsvSaturation)
+	ON_COMMAND(ID_32790, &CimageProcessingDoc::OnHsvValue)
+	ON_COMMAND(ID_32791, &CimageProcessingDoc::OnImageSub)
+	ON_COMMAND(ID_32794, &CimageProcessingDoc::OnImageMul)
+	ON_COMMAND(ID_32792, &CimageProcessingDoc::OnImageAnd)
+	ON_COMMAND(ID_32793, &CimageProcessingDoc::OnImageOr)
 END_MESSAGE_MAP()
 
 
@@ -40,7 +45,6 @@ END_MESSAGE_MAP()
 CimageProcessingDoc::CimageProcessingDoc() noexcept
 {
 	// TODO: 在此添加一次性构造代码
-	//更新了
 
 }
 
@@ -427,14 +431,14 @@ void CimageProcessingDoc::OnImageAdd()//图像相加
 		AfxMessageBox(_T("本软件只处理相同大小图像的逻辑和代数运算！"));
 		return;
 	}
-	/*CDialogImageAddRadio mdlg;
-	if (mdlg.doModal() != IDOK) {
+	CDialogImageAddRatio mdlg;
+	if (mdlg.DoModal() != IDOK) {
 		isImage.Destroy();
 		return;
 	}
 	double lambuda = mdlg.addRadio / 100.0;
-	*/
-	double lambuda = 0.5;
+	
+	//double lambuda = 0.5;
 	int x;
 	int y;
 	int nRows = m_sImage.GetHeight();
@@ -569,4 +573,430 @@ void CimageProcessingDoc::OnHsvSaturation()//饱和度：彩度除以明度，�
 		}
 
 	UpdateAllViews(NULL);
+}
+
+
+void CimageProcessingDoc::OnHsvValue()//亮度
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_sImage.IsNull())
+	{
+		AfxMessageBox(_T("请打开要处理的图像！"));
+		return;
+	}
+
+	int x;
+	int y;
+	int nRows = m_sImage.GetHeight();
+	int nCols = m_sImage.GetWidth();
+	int nBPP = m_sImage.GetBPP();
+
+	BYTE nRed, nGreen, nBlue, nGrey;
+	double  dVal;//饱和度分量
+	m_rImage.Destroy();
+
+	if (!m_rImage.Create(nCols, nRows, nBPP))
+		return;
+	BYTE *sImageData = (BYTE *)m_sImage.GetBits();
+	BYTE *rImageData = (BYTE *)m_rImage.GetBits();
+	int nRowBytes = m_sImage.GetPitch();
+	BYTE MIN;
+	for (y = 0; y < nRows; y++)
+		for (x = 0; x < nCols; x++)
+		{
+			nBlue = sImageData[y * nRowBytes + x * 3 + 0];
+			nGreen = sImageData[y * nRowBytes + x * 3 + 1];
+			nRed = sImageData[y * nRowBytes + x * 3 + 2];
+
+			if (nBlue < nGreen) {
+				MIN = nBlue;
+			}
+			else {
+				MIN = nGreen;
+			}
+			if (nRed < MIN) {
+				MIN = nRed;
+			}
+			dVal = (double)(nRed + nGreen + nBlue) / 3.0;
+			
+			nGrey = (BYTE)(255.0*dVal);
+			rImageData[y * nRowBytes + x * 3] = (BYTE)nGrey;
+			rImageData[y * nRowBytes + x * 3 + 1] = (BYTE)nGrey;
+			rImageData[y * nRowBytes + x * 3 + 2] = (BYTE)nGrey;
+		}
+
+	UpdateAllViews(NULL);
+}
+
+
+void CimageProcessingDoc::OnImageSub() 
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_sImage.IsNull())
+	{
+		AfxMessageBox(_T("请打开要处理的图像！"));
+		return;
+	}
+
+	CImage lsImage;
+	CString strFilter;
+	CSimpleArray<GUID>  aguidFileTypes;
+	HRESULT hResult;
+
+	// 获取CImage支持的图像文件的过滤字符串
+	hResult = m_sImage.GetExporterFilterString(strFilter, aguidFileTypes, _T("All Image Files"));
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("GetExporterFilter函数失败!"));
+		return;
+	}
+
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_FILEMUSTEXIST, strFilter);
+	if (IDOK != dlg.DoModal())
+		return;
+
+	lsImage.Destroy();
+
+	// 将外部图像文件装载到CImage对象中
+	hResult = lsImage.Load(dlg.GetPathName());
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("图像文件加载失败！"));
+		return;
+	}
+
+	if (lsImage.GetBPP() != 24)
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("只处理24位色图像！"));
+		return;
+	}
+
+	if ((lsImage.GetHeight() != m_sImage.GetHeight()) || (lsImage.GetWidth() != m_sImage.GetWidth()))
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("本软件只处理相同大小图像的逻辑与代数运算！"));
+		return;
+	}
+
+	CDialogImageAddRatio mdlg;  //图像减法占比对话框
+	if (mdlg.DoModal() != IDOK)
+	{
+		lsImage.Destroy();
+		return;
+	}
+
+	double lambuda = mdlg.addRadio / 100.0;
+
+	int x;
+	int y;
+	int nRows = m_sImage.GetHeight();
+	int nCols = m_sImage.GetWidth();
+	int nBPP = m_sImage.GetBPP();
+
+	m_rImage.Destroy();
+	if (!m_rImage.Create(nCols, nRows, nBPP))
+	{
+		lsImage.Destroy();
+		return;
+	}
+
+	BYTE *sImageData = (BYTE *)m_sImage.GetBits();
+	BYTE *lsImageData = (BYTE *)lsImage.GetBits();
+	BYTE *rImageData = (BYTE *)m_rImage.GetBits();
+	int nRowBytes = m_sImage.GetPitch();
+
+	int sRowBytes = m_sImage.GetPitch();
+	int nrgb;
+	for (y = 0; y < nRows; y++)
+		for (x = 0; x < nCols; x++)
+		{
+			nrgb = (int)(lambuda * sImageData[y * nRowBytes + x * 3 + 0] - (1 - lambuda) * lsImageData[y * nRowBytes + x * 3 + 0]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 0] = nrgb;
+			nrgb = (int)(lambuda * sImageData[y * nRowBytes + x * 3 + 1] - (1 - lambuda) * lsImageData[y * nRowBytes + x * 3 + 1]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 1] = nrgb;
+			nrgb = (int)(lambuda * sImageData[y * nRowBytes + x * 3 + 2] - (1 - lambuda) * lsImageData[y * nRowBytes + x * 3 + 2]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 2] = nrgb;
+		}
+
+	lsImage.Destroy();
+
+	UpdateAllViews(NULL);
+}
+
+
+
+void CimageProcessingDoc::OnImageMul()
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_sImage.IsNull())
+	{
+		AfxMessageBox(_T("请打开要处理的图像！"));
+		return;
+	}
+
+	CImage lsImage;
+	CString strFilter;
+	CSimpleArray<GUID>  aguidFileTypes;
+	HRESULT hResult;
+
+	// 获取CImage支持的图像文件的过滤字符串
+	hResult = m_sImage.GetExporterFilterString(strFilter, aguidFileTypes, _T("All Image Files"));
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("GetExporterFilter函数失败!"));
+		return;
+	}
+
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_FILEMUSTEXIST, strFilter);
+	if (IDOK != dlg.DoModal())
+		return;
+
+	lsImage.Destroy();
+
+	// 将外部图像文件装载到CImage对象中
+	hResult = lsImage.Load(dlg.GetPathName());
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("图像文件加载失败！"));
+		return;
+	}
+
+	if (lsImage.GetBPP() != 24)
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("只处理24位色图像！"));
+		return;
+	}
+
+	if ((lsImage.GetHeight() != m_sImage.GetHeight()) || (lsImage.GetWidth() != m_sImage.GetWidth()))
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("本软件只处理相同大小图像的逻辑与代数运算！"));
+		return;
+	}
+
+	int x;
+	int y;
+	int nRows = m_sImage.GetHeight();
+	int nCols = m_sImage.GetWidth();
+	int nBPP = m_sImage.GetBPP();
+
+	m_rImage.Destroy();
+	if (!m_rImage.Create(nCols, nRows, nBPP))
+	{
+		lsImage.Destroy();
+		return;
+	}
+
+	BYTE *sImageData = (BYTE *)m_sImage.GetBits();
+	BYTE *lsImageData = (BYTE *)lsImage.GetBits();
+	BYTE *rImageData = (BYTE *)m_rImage.GetBits();
+	int nRowBytes = m_sImage.GetPitch();
+
+	int sRowBytes = m_sImage.GetPitch();
+	int nrgb;
+	for (y = 0; y < nRows; y++)
+		for (x = 0; x < nCols; x++)
+		{
+			nrgb = (int)(sImageData[y * nRowBytes + x * 3 + 0] * lsImageData[y * nRowBytes + x * 3 + 0]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 0] = nrgb;
+			nrgb = (int)(sImageData[y * nRowBytes + x * 3 + 1] * lsImageData[y * nRowBytes + x * 3 + 1]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 1] = nrgb;
+			nrgb = (int)(sImageData[y * nRowBytes + x * 3 + 2] * lsImageData[y * nRowBytes + x * 3 + 2]);
+			nrgb = (nrgb < 0) ? 0 : ((nrgb > 255) ? 255 : nrgb);
+			rImageData[y * nRowBytes + x * 3 + 2] = nrgb;
+		}
+
+	lsImage.Destroy();
+
+	UpdateAllViews(NULL);
+}
+
+
+
+void CimageProcessingDoc::OnImageAnd()//与运算
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_sImage.IsNull())
+	{
+		AfxMessageBox(_T("请打开要处理的图像！"));
+		return;
+	}
+
+	CImage lsImage;
+	CString strFilter;
+	CSimpleArray<GUID>  aguidFileTypes;
+	HRESULT hResult;
+
+	// 获取CImage支持的图像文件的过滤字符串
+	hResult = m_sImage.GetExporterFilterString(strFilter, aguidFileTypes, _T("All Image Files"));
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("GetExporterFilter函数失败!"));
+		return;
+	}
+
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_FILEMUSTEXIST, strFilter);
+	if (IDOK != dlg.DoModal())
+		return;
+
+	lsImage.Destroy();
+
+	// 将外部图像文件装载到CImage对象中
+	hResult = lsImage.Load(dlg.GetPathName());
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("图像文件加载失败！"));
+		return;
+	}
+
+	if (lsImage.GetBPP() != 24)
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("只处理24位色图像！"));
+		return;
+	}
+
+	if ((lsImage.GetHeight() != m_sImage.GetHeight()) || (lsImage.GetWidth() != m_sImage.GetWidth()))
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("本软件只处理相同大小图像的逻辑与代数运算！"));
+		return;
+	}
+
+	int x;
+	int y;
+	int nRows = m_sImage.GetHeight();
+	int nCols = m_sImage.GetWidth();
+	int nBPP = m_sImage.GetBPP();
+
+	m_rImage.Destroy();
+	if (!m_rImage.Create(nCols, nRows, nBPP))
+	{
+		lsImage.Destroy();
+		return;
+	}
+
+	BYTE *sImageData = (BYTE *)m_sImage.GetBits();
+	BYTE *lsImageData = (BYTE *)lsImage.GetBits();
+	BYTE *rImageData = (BYTE *)m_rImage.GetBits();
+	int nRowBytes = m_sImage.GetPitch();
+
+	int sRowBytes = m_sImage.GetPitch();
+	int nrgb;
+	for (y = 0; y < nRows; y++)
+		for (x = 0; x < nCols; x++){
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 0] < lsImageData[y * nRowBytes + x * 3 + 0])
+				? sImageData[y * nRowBytes + x * 3 + 0] : lsImageData[y * nRowBytes + x * 3 + 0];
+			rImageData[y * nRowBytes + x * 3 + 0] = nrgb;
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 1] < lsImageData[y * nRowBytes + x * 3 + 1])
+				? sImageData[y * nRowBytes + x * 3 + 1] : lsImageData[y * nRowBytes + x * 3 + 1];
+			rImageData[y * nRowBytes + x * 3 + 1] = nrgb;
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 2] < lsImageData[y * nRowBytes + x * 3 + 2])
+				? sImageData[y * nRowBytes + x * 3 + 2] : lsImageData[y * nRowBytes + x * 3 + 2];
+			rImageData[y * nRowBytes + x * 3 + 2] = nrgb;
+			
+		}
+
+	lsImage.Destroy();
+
+	UpdateAllViews(NULL);
+
+}
+
+
+void CimageProcessingDoc::OnImageOr()//或运算
+{
+	// TODO: 在此添加命令处理程序代码
+	if (m_sImage.IsNull())
+	{
+		AfxMessageBox(_T("请打开要处理的图像！"));
+		return;
+	}
+
+	CImage lsImage;
+	CString strFilter;
+	CSimpleArray<GUID>  aguidFileTypes;
+	HRESULT hResult;
+
+	// 获取CImage支持的图像文件的过滤字符串
+	hResult = m_sImage.GetExporterFilterString(strFilter, aguidFileTypes, _T("All Image Files"));
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("GetExporterFilter函数失败!"));
+		return;
+	}
+
+	CFileDialog dlg(TRUE, NULL, NULL, OFN_FILEMUSTEXIST, strFilter);
+	if (IDOK != dlg.DoModal())
+		return;
+
+	lsImage.Destroy();
+
+	// 将外部图像文件装载到CImage对象中
+	hResult = lsImage.Load(dlg.GetPathName());
+	if (FAILED(hResult))
+	{
+		AfxMessageBox(_T("图像文件加载失败！"));
+		return;
+	}
+
+	if (lsImage.GetBPP() != 24)
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("只处理24位色图像！"));
+		return;
+	}
+
+	if ((lsImage.GetHeight() != m_sImage.GetHeight()) || (lsImage.GetWidth() != m_sImage.GetWidth()))
+	{
+		lsImage.Destroy();
+		AfxMessageBox(_T("本软件只处理相同大小图像的逻辑与代数运算！"));
+		return;
+	}
+
+	int x;
+	int y;
+	int nRows = m_sImage.GetHeight();
+	int nCols = m_sImage.GetWidth();
+	int nBPP = m_sImage.GetBPP();
+
+	m_rImage.Destroy();
+	if (!m_rImage.Create(nCols, nRows, nBPP))
+	{
+		lsImage.Destroy();
+		return;
+	}
+
+	BYTE *sImageData = (BYTE *)m_sImage.GetBits();
+	BYTE *lsImageData = (BYTE *)lsImage.GetBits();
+	BYTE *rImageData = (BYTE *)m_rImage.GetBits();
+	int nRowBytes = m_sImage.GetPitch();
+
+	int sRowBytes = m_sImage.GetPitch();
+	int nrgb;
+	for (y = 0; y < nRows; y++)
+		for (x = 0; x < nCols; x++) {
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 0] > lsImageData[y * nRowBytes + x * 3 + 0])
+				? sImageData[y * nRowBytes + x * 3 + 0] : lsImageData[y * nRowBytes + x * 3 + 0];
+			rImageData[y * nRowBytes + x * 3 + 0] = nrgb;
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 1] > lsImageData[y * nRowBytes + x * 3 + 1])
+				? sImageData[y * nRowBytes + x * 3 + 1] : lsImageData[y * nRowBytes + x * 3 + 1];
+			rImageData[y * nRowBytes + x * 3 + 1] = nrgb;
+			nrgb = (sImageData[y * nRowBytes + x * 3 + 2] > lsImageData[y * nRowBytes + x * 3 + 2])
+				? sImageData[y * nRowBytes + x * 3 + 2] : lsImageData[y * nRowBytes + x * 3 + 2];
+			rImageData[y * nRowBytes + x * 3 + 2] = nrgb;
+
+		}
+
+	lsImage.Destroy();
+
+	UpdateAllViews(NULL);
+
 }

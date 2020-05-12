@@ -2,7 +2,7 @@
 // imageProcessingDoc.h: CimageProcessingDoc 类的接口
 //
 
-
+#include "CDialogImageAddRatio.h"
 #pragma once
 
 
@@ -58,4 +58,9 @@ public:
 	afx_msg void OnImageAdd();
 	afx_msg void OnHsvHue();
 	afx_msg void OnHsvSaturation();
+	afx_msg void OnHsvValue();
+	afx_msg void OnImageSub();
+	afx_msg void OnImageMul();
+	afx_msg void OnImageAnd();
+	afx_msg void OnImageOr();
 };
